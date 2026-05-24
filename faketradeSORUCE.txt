@@ -4722,18 +4722,6 @@ New("TextLabel", {
         TextStrokeColor3 = Color3.fromRGB(0, 0, 0),
         Parent = tbar,
 })
--- Discord link
-New("TextLabel", {
-        Size = UDim2.new(1, -50, 0, 14),
-        Position = UDim2.new(0, 42, 0, 30),
-        Text = "discord.gg/8HNEwrZUut",
-        TextColor3 = Color3.fromRGB(130, 130, 200),
-        Font = Enum.Font.Gotham,
-        TextSize = 11,
-        BackgroundTransparency = 1,
-        TextXAlignment = Enum.TextXAlignment.Left,
-        Parent = tbar,
-})
 -- Divisor inferior del tbar
 New("Frame", {
         Size = UDim2.new(1, -20, 0, 1),
