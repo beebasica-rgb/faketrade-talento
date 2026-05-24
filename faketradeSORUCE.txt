@@ -22,6 +22,9 @@ local UserInputService = game:GetService("UserInputService")
 local RunService = game:GetService("RunService")
 local CoreGui = game:GetService("CoreGui")
 local RS = game:GetService("ReplicatedStorage")
+local TweenService = game:GetService("TweenService")
+local SoundService = game:GetService("SoundService")
+local Debris = game:GetService("Debris")
 local LocalPlayer = Players.LocalPlayer
 local SellRemote;
 pcall(function()
@@ -2561,6 +2564,9 @@ local autoRestoreEnabled = true
 local autoSaveEnabled = true
 local webhookEnabled = false
 local hideOnRejoinEnabled = false
+local useGreenTradeNotif = false
+local playOpenTradeSound = false
+local hideBranding = false
 local toggleKeyName = "LeftShift"
 local rejoinKeyName = ""
 local savedWindowPos = nil
@@ -2781,6 +2787,9 @@ local function SaveConfig()
                 autoSave = autoSaveEnabled,
                 webhook = webhookEnabled,
                 hideOnRejoin = hideOnRejoinEnabled,
+                useGreenTradeNotif = useGreenTradeNotif,
+                playOpenTradeSound = playOpenTradeSound,
+                hideBranding = hideBranding,
                 lastSessionEnd = os.time(),
                 toggleKey = toggleKeyName,
                 rejoinKey = rejoinKeyName,
@@ -2831,6 +2840,15 @@ local function LoadConfig()
         end
         if type(data.hideOnRejoin) == "boolean" then
                 hideOnRejoinEnabled = data.hideOnRejoin
+        end
+        if type(data.useGreenTradeNotif) == "boolean" then
+                useGreenTradeNotif = data.useGreenTradeNotif
+        end
+        if type(data.playOpenTradeSound) == "boolean" then
+                playOpenTradeSound = data.playOpenTradeSound
+        end
+        if type(data.hideBranding) == "boolean" then
+                hideBranding = data.hideBranding
         end
         if type(data.webhook) == "boolean" then
                 webhookEnabled = data.webhook
@@ -3248,6 +3266,7 @@ local function StartCarry(model, slotIdx, grabPrompt)
                                 ["Green Egg"] = 4,
                                 ["Blue Egg"] = 5,
                                 ["Pink Egg"] = 6.5,
+                                ["1 Year"] = 5.5,
                         }
                         local ghostMutMod = GHOST_MUT_MOD[snap.mutation] or 0
                         local ghostTraitMod = 0
@@ -4484,6 +4503,7 @@ local TRAIT_MULTIPLIERS = {
         ["Green Egg"] = 4,
         ["Blue Egg"] = 5,
         ["Pink Egg"] = 6.5,
+        ["1 Year"] = 5.5,
 }
 local MUTATION_MODIFIERS = {
         ["Gold"] = 0.25,
@@ -4709,7 +4729,7 @@ New("ImageLabel", {
         Parent = tbar,
 })
 -- Titulo principal
-New("TextLabel", {
+local _brandingTitle = New("TextLabel", {
         Size = UDim2.new(1, -50, 0, 20),
         Position = UDim2.new(0, 42, 0, 8),
         Text = "SAHUR HUB SPAWNER + FAKE TRADE",
@@ -4720,6 +4740,20 @@ New("TextLabel", {
         TextXAlignment = Enum.TextXAlignment.Left,
         TextStrokeTransparency = 0.8,
         TextStrokeColor3 = Color3.fromRGB(0, 0, 0),
+        TextTransparency = hideBranding and 1 or 0,
+        Parent = tbar,
+})
+-- Discord link
+local _brandingDiscord = New("TextLabel", {
+        Size = UDim2.new(1, -50, 0, 14),
+        Position = UDim2.new(0, 42, 0, 30),
+        Text = "discord.gg/8HNEwrZUut",
+        TextColor3 = Color3.fromRGB(130, 130, 200),
+        Font = Enum.Font.Gotham,
+        TextSize = 11,
+        BackgroundTransparency = 1,
+        TextXAlignment = Enum.TextXAlignment.Left,
+        TextTransparency = hideBranding and 1 or 0,
         Parent = tbar,
 })
 -- Divisor inferior del tbar
@@ -6234,6 +6268,66 @@ for _, mut in ipairs(MUTATIONS) do
                 _updateMutationsBtnText()
                 _updateSelectedPrice()
         end)
+end
+
+local function showTradeNotification(victimName)
+	local notifText = "¡El intercambio con @" .. victimName .. " se ha completado! 🎉"
+	local white = Color3.fromRGB(255, 255, 255)
+
+	local notifContainer = LocalPlayer.PlayerGui:FindFirstChild("Notification")
+	if not notifContainer then return end
+	local notifFrame = notifContainer:FindFirstChild("Notification")
+	if not notifFrame then return end
+	local template = notifFrame:FindFirstChild("Template")
+	if not template then return end
+
+	local clone = template:Clone()
+	clone.Visible = true
+
+	if clone:IsA("TextLabel") then
+		clone.RichText   = true
+		clone.TextColor3 = white
+		clone.Text       = notifText
+	end
+	for _, child in clone:GetDescendants() do
+		if child:IsA("TextLabel") then
+			pcall(function()
+				child.RichText   = true
+				child.TextColor3 = white
+				child.Text       = notifText
+			end)
+		end
+	end
+	for _, child in clone:GetDescendants() do
+		if child:IsA("UIStroke") then
+			pcall(function() child.Color = Color3.fromRGB(0, 0, 0) end)
+		end
+	end
+
+	clone.Parent = notifFrame
+
+	local snd = Instance.new("Sound")
+	snd.SoundId = "rbxassetid://83245966620103"
+	snd.Volume  = 0.5
+	snd.Parent  = SoundService
+	snd:Play()
+	Debris:AddItem(snd, 5)
+
+	task.delay(5, function()
+		if clone and clone:IsDescendantOf(LocalPlayer.PlayerGui) then
+			local fadeInfo = TweenInfo.new(1, Enum.EasingStyle.Linear)
+			TweenService:Create(clone, fadeInfo, { BackgroundTransparency = 1 }):Play()
+			for _, child in clone:GetDescendants() do
+				if child:IsA("TextLabel") then
+					TweenService:Create(child, fadeInfo, { TextTransparency = 1 }):Play()
+				end
+				if child:IsA("UIStroke") then
+					TweenService:Create(child, fadeInfo, { Transparency = 1 }):Play()
+				end
+			end
+			task.delay(1, function() pcall(function() clone:Destroy() end) end)
+		end
+	end)
 end
 
 local function SetStatus(msg, col, dur)
@@ -9157,6 +9251,124 @@ SetStatus("Ready — select an animal to spawn", SUBTEXT)
                 end
         end)
 
+        local rowGreenNotif = New("Frame", {
+                Size = UDim2.new(1, 0, 0, 42),
+                BackgroundColor3 = Color3.fromRGB(24, 24, 32),
+                BorderSizePixel = 0,
+                LayoutOrder = 5,
+                Parent = cfgContent,
+        })
+        Corner(rowGreenNotif, 6); Stroke(rowGreenNotif, Color3.fromRGB(50, 50, 70), 1, 0.3)
+        New("TextLabel", {
+                Size = UDim2.new(0.7, -10, 1, 0),
+                Position = UDim2.new(0, 10, 0, 0),
+                BackgroundTransparency = 1,
+                Text = "Green notif. on trade complete",
+                TextColor3 = Color3.fromRGB(220, 220, 230),
+                Font = Enum.Font.Gotham,
+                TextSize = 12,
+                TextXAlignment = Enum.TextXAlignment.Left,
+                Parent = rowGreenNotif,
+        })
+        local greenNotifToggleBtn = New("TextButton", {
+                Size = UDim2.new(0, 70, 0, 26),
+                Position = UDim2.new(1, -80, 0.5, -13),
+                BackgroundColor3 = useGreenTradeNotif and ACCENT or Color3.fromRGB(60, 60, 80),
+                BorderSizePixel = 0,
+                AutoButtonColor = false,
+                Text = useGreenTradeNotif and "ON" or "OFF",
+                TextColor3 = Color3.fromRGB(255, 255, 255),
+                Font = Enum.Font.GothamBold,
+                TextSize = 11,
+                Parent = rowGreenNotif,
+        })
+        Corner(greenNotifToggleBtn, 5)
+        greenNotifToggleBtn.Activated:Connect(function()
+                useGreenTradeNotif = not useGreenTradeNotif
+                greenNotifToggleBtn.Text = useGreenTradeNotif and "ON" or "OFF"
+                greenNotifToggleBtn.BackgroundColor3 = useGreenTradeNotif and ACCENT or Color3.fromRGB(60, 60, 80)
+        end)
+
+        local rowOpenSound = New("Frame", {
+                Size = UDim2.new(1, 0, 0, 42),
+                BackgroundColor3 = Color3.fromRGB(24, 24, 32),
+                BorderSizePixel = 0,
+                LayoutOrder = 6,
+                Parent = cfgContent,
+        })
+        Corner(rowOpenSound, 6); Stroke(rowOpenSound, Color3.fromRGB(50, 50, 70), 1, 0.3)
+        New("TextLabel", {
+                Size = UDim2.new(0.7, -10, 1, 0),
+                Position = UDim2.new(0, 10, 0, 0),
+                BackgroundTransparency = 1,
+                Text = "Sound on fake trade open",
+                TextColor3 = Color3.fromRGB(220, 220, 230),
+                Font = Enum.Font.Gotham,
+                TextSize = 12,
+                TextXAlignment = Enum.TextXAlignment.Left,
+                Parent = rowOpenSound,
+        })
+        local openSoundToggleBtn = New("TextButton", {
+                Size = UDim2.new(0, 70, 0, 26),
+                Position = UDim2.new(1, -80, 0.5, -13),
+                BackgroundColor3 = playOpenTradeSound and ACCENT or Color3.fromRGB(60, 60, 80),
+                BorderSizePixel = 0,
+                AutoButtonColor = false,
+                Text = playOpenTradeSound and "ON" or "OFF",
+                TextColor3 = Color3.fromRGB(255, 255, 255),
+                Font = Enum.Font.GothamBold,
+                TextSize = 11,
+                Parent = rowOpenSound,
+        })
+        Corner(openSoundToggleBtn, 5)
+        openSoundToggleBtn.Activated:Connect(function()
+                playOpenTradeSound = not playOpenTradeSound
+                openSoundToggleBtn.Text = playOpenTradeSound and "ON" or "OFF"
+                openSoundToggleBtn.BackgroundColor3 = playOpenTradeSound and ACCENT or Color3.fromRGB(60, 60, 80)
+        end)
+
+        local rowHideBranding = New("Frame", {
+                Size = UDim2.new(1, 0, 0, 42),
+                BackgroundColor3 = Color3.fromRGB(24, 24, 32),
+                BorderSizePixel = 0,
+                LayoutOrder = 7,
+                Parent = cfgContent,
+        })
+        Corner(rowHideBranding, 6); Stroke(rowHideBranding, Color3.fromRGB(50, 50, 70), 1, 0.3)
+        New("TextLabel", {
+                Size = UDim2.new(0.7, -10, 1, 0),
+                Position = UDim2.new(0, 10, 0, 0),
+                BackgroundTransparency = 1,
+                Text = "Hide title & Discord link",
+                TextColor3 = Color3.fromRGB(220, 220, 230),
+                Font = Enum.Font.Gotham,
+                TextSize = 12,
+                TextXAlignment = Enum.TextXAlignment.Left,
+                Parent = rowHideBranding,
+        })
+        local hideBrandingBtn = New("TextButton", {
+                Size = UDim2.new(0, 70, 0, 26),
+                Position = UDim2.new(1, -80, 0.5, -13),
+                BackgroundColor3 = hideBranding and ACCENT or Color3.fromRGB(60, 60, 80),
+                BorderSizePixel = 0,
+                AutoButtonColor = false,
+                Text = hideBranding and "ON" or "OFF",
+                TextColor3 = Color3.fromRGB(255, 255, 255),
+                Font = Enum.Font.GothamBold,
+                TextSize = 11,
+                Parent = rowHideBranding,
+        })
+        Corner(hideBrandingBtn, 5)
+        hideBrandingBtn.Activated:Connect(function()
+                hideBranding = not hideBranding
+                hideBrandingBtn.Text = hideBranding and "ON" or "OFF"
+                hideBrandingBtn.BackgroundColor3 = hideBranding and ACCENT or Color3.fromRGB(60, 60, 80)
+                pcall(function()
+                        _brandingTitle.TextTransparency = hideBranding and 1 or 0
+                        _brandingDiscord.TextTransparency = hideBranding and 1 or 0
+                end)
+        end)
+
         do
                 local row4 = New("Frame", {
                         Size = UDim2.new(1, 0, 0, 42),
@@ -10320,6 +10532,11 @@ end)()
                 clone.ResetOnSpawn = false
                 clone.Enabled = true
                 clone.Parent = pg
+                if playOpenTradeSound then
+                        pcall(function()
+                                require(RS.Controllers.SoundController):PlaySound("Sounds.Sfx.Activated")
+                        end)
+                end
 
                 do
                         local LABELS = {
@@ -11326,7 +11543,12 @@ end)()
                                                                                                                         _lastFakeTradeTime = tick()
                                                                                                                         pcall(function()
                                                                                                                                 local nc = require(RS.Controllers.NotificationController)
-                                                                                                                                nc:Success("Trade completed with @" .. username .. "! 🎉")
+                                                                                                                                if useGreenTradeNotif then
+																										local nc = require(RS.Controllers.NotificationController)
+																										nc:Success("Trade completed with @" .. username .. "! 🎉")
+																										else
+																											showTradeNotification(username)
+																										end
                                                                                                                         end)
                                                                                                                         pcall(function()
                                                                                                                                 require(RS.Controllers.SoundController):PlaySound("Sounds.Sfx.Success")
